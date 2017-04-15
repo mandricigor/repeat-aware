@@ -1,6 +1,6 @@
 
 
-# About Me
+# About
 
 
   [Home](index.md) |
