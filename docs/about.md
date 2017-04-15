@@ -9,7 +9,7 @@
   [About](about.md)
 
 
-The framework is designed and developed by [mandricigor](https://github.com/mandricigor). Igor Mandric is a PhD candidate being a part of [Bioinformatics Research Group](http://alan.cs.gsu.edu/) led by Dr Alex Zelikovsky ([Georgia State University](http://www.gsu.edu)).
+The framework is designed and developed by [mandricigor](https://github.com/mandricigor). [Igor Mandric](https://twitter.com/imandric1) is a PhD candidate being a part of [Bioinformatics Research Group](http://alan.cs.gsu.edu/) led by Dr Alex Zelikovsky ([Georgia State University](http://www.gsu.edu)).
 
 <p align="center">
   <img src="https://tctechcrunch2011.files.wordpress.com/2015/11/hong-kong.jpg">
