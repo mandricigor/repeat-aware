@@ -4,9 +4,9 @@ Repeat Aware Evaluation of Scaffolding Tools
 </h1>
 
 <p align="center">
-  <a href="#">Home</a> |
-  <a href="#">Install&Use</a> |
-  <a href="#">About</a>
+  <a href=[[index]]>Home</a> |
+  <a href=[[install]]>Install&Use</a> |
+  <a href=[[about]]>About</a>
 </p>
 
 
