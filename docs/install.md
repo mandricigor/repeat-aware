@@ -14,7 +14,7 @@ We use the following scripts/libraries:
 - **Fastaq** script suite from [(Hunt et al., *Genome Biology*, 2014)](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2014-15-3-r42). For convenience, the source of **Fastaq** is included in the repository
 - [Biopython](http://biopython.org/) library
 - Python API of CPLEX
-- [MUMmer]http://mummer.sourceforge.net/ (rapid alignment of very large DNA and amino acid sequences)
+- [MUMmer](http://mummer.sourceforge.net/) (rapid alignment of very large DNA and amino acid sequences)
 
 ### Install Biopython
 
@@ -90,7 +90,7 @@ Finally, to evaluate a scaffolding tool we have to find the assignment of the **
 python validation.py $outdir/out_scaf.scaf $outdir/ref_scaf.scaf
 ~~~
 
-The output is the number of correct contig links and two measures
+The output is the number of correct contig links and two measures - sensitivity and PPV (positive predictive value).
 
 
 
