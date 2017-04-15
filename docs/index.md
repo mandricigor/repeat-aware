@@ -35,7 +35,7 @@ In the picture below (credit to Sergey Knyazev, GSU) is a simple example illustr
   <img src="http://alan.cs.gsu.edu/repeat-aware/figure.png">
 </p>
 
-- **Reference Scaffolding** is the "golden true" scaffolding
+- **Reference Scaffolding** is the "golden truth" scaffolding
 - **Inferred Scaffolding** is the scaffolding produced by a tool
 
 **Contig 2** has two copies in the reference, namely **2a** and **2b**. **Contig 4** has only one copy, but is inferred to have two copies **4a** and **4b** in the inferred scaffolding.
