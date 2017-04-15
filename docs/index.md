@@ -3,11 +3,11 @@
 Repeat Aware Evaluation of Scaffolding Tools
 </h1>
 
-<p align="center">
-  [Home] (index.md) |
-  [Install&Use] (install.md) |
-  [About] (about)
-</p>
+
+  [Home](index.md) |
+  [Install&Use](install.md) |
+  [About](about.md)
+
 
 
 The aim of this project is to provide a framework for **repeat aware** evaluation of scaffolding tools. The first comprehensive scaffolding evaluation was performed in [(Hunt et al., *Genome Biology*, 2014)](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2014-15-3-r42). Its main drawback is that it considers only the **"best match"** for each contig, i.e. the alignment of the contig to the genome with the highest similarity score.
