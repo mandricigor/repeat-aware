@@ -2,11 +2,10 @@
 
 # About Me
 
+
 <p align="center">
-  [[Home | index]] |
-  [[Install&Use | install]] |
-  [[About | about]]
+  [Home] (index.md) |
+  [Install&Use] (install.md) |
+  [About] (about)
 </p>
-
-
 
