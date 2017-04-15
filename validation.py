@@ -390,12 +390,12 @@ for x in cpx.variables.get_names():
         x = x.split("#")[1]
         answer_dict[x] = []
 
-for x, y in zip(cpx.variables.get_names(), cpx.solution.get_values()):
-    if y > 0.1 and "X" in x:
-        x = x.split("#")
-        a = x[1]
-        b = x[2].split("_")[0]
-        print "%s %s" % (a, b)
+#for x, y in zip(cpx.variables.get_names(), cpx.solution.get_values()):
+#    if y > 0.1 and "X" in x:
+#        x = x.split("#")
+#        a = x[1]
+#        b = x[2].split("_")[0]
+#        print "%s %s" % (a, b)
 
 
 
@@ -422,7 +422,21 @@ for scaf in scaffold:
         j += 1
     scaf_answer.append(sa)
 
-print scaf_answer
+#print scaf_answer
 
-print(cpx.solution.get_objective_value())
+correct_links = int(cpx.solution.get_objective_value())
 
+print "CORRECT LINKS:", correct_links
+
+inferred_links =  sum(map(lambda x: x - 1, map(len, scaf_answer)))
+
+ref_links = sum(map(lambda x: x - 1, map(len, reference)))
+
+
+sens = correct_links * 1.0 / ref_links
+
+if inferred_links > 0:
+    ppv = correct_links * 1.0 / inferred_links
+else:
+    ppv = 100.0
+print "%.2f" % sens, "%.2f" % ppv
