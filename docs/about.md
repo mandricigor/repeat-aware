@@ -3,7 +3,6 @@
 # About Me
 
 
-[Home] (index.md) |
-[Install&Use] (install.md) |
-[About] (about)
-
+  [Home](index.md) |
+  [Install&Use](install.md) |
+  [About](about.md)
