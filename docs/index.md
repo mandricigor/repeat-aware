@@ -32,5 +32,5 @@ Below is a simple example illustrating the main idea.
 **Contig 2** has two copies in the reference, namely **2a** and **2b**. **Contig 4** has only one copy, but is inferred to have two copies **4a** and **4b** in the inferred scaffolding.
 
 
-Our approach is to assign contigs in the ** Inferred Scaffolding** to the contigs of the ** Reference Scaffolding** maximizing the number of correct links. Asigning **Contig 2** and **Contig 4a** from the **Inferred Scaffolding** to **Contig 2a** and **Contig 4** in the **Reference Scaffolding** correspondingly, we obtaing **2** correct links. Any other assingment delivers less correct links.
+Our approach is to assign contigs in the **Inferred Scaffolding** to the contigs of the **Reference Scaffolding** maximizing the number of correct links. Asigning **Contig 2** and **Contig 4a** from the **Inferred Scaffolding** to **Contig 2a** and **Contig 4** in the **Reference Scaffolding** correspondingly, we obtaing **2** correct links. Any other assingment delivers less correct links.
 
