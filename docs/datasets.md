@@ -22,5 +22,5 @@ reference genome, Velvet contigs, and **Reference Scaffolding**. For downloading
 
 <br><br>
 
-Please free to download the **Reference Scaffolding** and experiment with your scaffolding tool of choice. We strongly believe that our 
-framework is a helpful tool in scaffolding assembly research.
+Please feel free to download the **Reference Scaffolding** and experiment with your scaffolding tool of choice. We strongly believe that our 
+framework is a helpful tool for a scaffolding assembly research.
