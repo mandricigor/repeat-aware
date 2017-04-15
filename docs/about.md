@@ -5,6 +5,7 @@
 
   [Home](index.md) |
   [Install&Use](install.md) |
+  [Datasets](datasets.md) |
   [About](about.md)
 
 
