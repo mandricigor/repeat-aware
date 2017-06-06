@@ -30,7 +30,7 @@ We proposed a new evaluation framework which has the following advantages:
 - Ease-of-use
 
 
-In the picture below (credit to Sergey Knyazev, GSU) is a simple example illustrating the main idea.
+In the picture below is a simple example illustrating the main idea.
   
 <p align="center">
   <img src="http://alan.cs.gsu.edu/repeat-aware/figure.png">
