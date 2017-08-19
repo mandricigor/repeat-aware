@@ -1,4 +1,5 @@
 
+from collections import Counter
 from Bio import SeqIO
 import sys
 import shutil
@@ -13,7 +14,7 @@ utils.syscall(' '.join(['delta-filter', '-i 97 -l 180 -r', prefix + ".delta", '>
 utils.syscall(' '.join(['show-coords', '-dTlro', prefix + ".filter", '>', prefix + ".coords"]))
 
 
-
+#prefix = "prefix"
 
 
 
@@ -23,6 +24,9 @@ with open(prefix + ".coords") as f:
 a = a[4:] # drop the header lines from nucmer hit file
 a = list(map(lambda x: x.strip().split(), a))
 
+
+contig_hits = [x[12] for x in a]
+contig_hits_counts = Counter(contig_hits)
 
 # groups is the list of groups by reference
 groups = [[a[0]]]
@@ -55,6 +59,7 @@ for linegroup, group in zip(linegroups, groups):
 
 contig_map = {}
 
+count = 0
 scaffolds = []
 chosen_lines = []
 for alllinegroup, group in zip(alllinegroups, allgroups):
@@ -64,8 +69,9 @@ for alllinegroup, group in zip(alllinegroups, allgroups):
         if len(group2) == 1 and len(group2[0]) == 12:
             # if the contig does not match completely -> skip it
             # we do not need it anymore
+            print ("CONTINUE")
             continue
-        elif len(group2) == 1 and len(group2[0]) == 13:
+        elif len(group2) == 1 and len(group2[0]) == 14 and group2[0][-1] != "[CONTAINED]":
             # it has probably a full match
                 name = group2[0][12]
                 scaf.append(name + ":::" + group2[0][10] + ":::" + str(int(group2[0][1]) - int(group2[0][0])))
@@ -74,13 +80,23 @@ for alllinegroup, group in zip(alllinegroups, allgroups):
             # here we may have contigs corresponding to circular genomes
             # if it has both [BEGINS] and [ENDS] -> we just split it
             # or we still have mis-assembly - just merge all hits
-            if int(group2[-1][1]) - int(group2[0][0]) > 0.97 * int(group2[0][8]):
+            if int(group2[-1][1]) - int(group2[0][0]) > 0.9 * int(group2[0][8]):
                 name = group2[0][12]
                 scaf.append(name + ":::" + group2[0][10] + ":::" + str(int(group2[-1][1]) - int(group2[0][0])))
                 chosen.append(linegroup2)
+            else:
+                # check if this is the only hit
+                #print ("DECI SUKA")
+                print (group2)
+                if group2[0][12] in contig_hits_counts and contig_hits_counts[group2[0][12]] == 1:
+                    scaf.append(name + ":::" + group2[0][10] + ":::" + str(int(group2[-1][1]) - int(group2[0][0])))
+                #chosen.append(linegroup2)
+        count += 1
     if scaf:
         chosen_lines.append(chosen)
         scaffolds.append(scaf)
+
+print("COUNT:" + str(count))
 
 
 distances = []
@@ -94,6 +110,7 @@ for cluster in chosen_lines:
 rev_contig_map = {}
 for x, y in contig_map.items():
     rev_contig_map[y] = x
+
 
 
 with open(prefix + ".scaf", "w") as f:

@@ -33,11 +33,11 @@ def pairwise(iterable):
 
 
 # toy example
-#scaffold = [['M', 'A', 'B'], ['C', 'D', 'G'], ['E', 'H', 'I'], ['A', 'B', 'C', 'D', 'E', 'F'], ['G', 'F', 'J', 'K']]
-#scaf_orient = [["+", "+", "+"], ["+", "+", "+"], ["+", "+", "+"], ["+", "+", "+", "+", "+", "+"], ["+", "+", "+", "+"]]
+#scaffold = [['M', 'A', 'B'], ['C', 'D', 'G'], ['E', 'H', 'I'], ['A', 'B', 'C', 'D', 'E', 'F'], ['G', 'F', 'J', 'K', 'A']]
+#scaf_orient = [["+", "+", "+"], ["+", "+", "+"], ["+", "+", "+"], ["+", "+", "+", "+", "+", "+"], ["+", "+", "+", "+", "-"]]
 
-#reference = [['M', 'A', 'B', 'C', 'D', 'G', 'E', 'H', 'I', 'A', 'B', 'C', 'G', 'F', 'J', 'K', 'D', 'E', 'F']]
-#ref_orient = [["+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+"]]
+#reference = [['M', 'A', 'B', 'C', 'D', 'G', 'E', 'H', 'I', 'A', 'B', 'C', 'G', 'F', 'J', 'K', 'D', 'E', 'F', 'Z']]
+#ref_orient = [["+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "-"]]
 
 
 
@@ -66,8 +66,48 @@ def parse_scaf_file(scaffile):
 
 
 
+
+
+
+
 scaffold, scaf_orient = parse_scaf_file(sys.argv[1])
 reference, ref_orient = parse_scaf_file(sys.argv[2])
+
+
+# paper example
+#scaffold = [["f", "a", "b", "c", "d", "e", "d"], ["g"]]
+#scaf_orient = [["+", "+", "+", "-", "+", "+", "+"], ["-"]]
+
+#reference = [["a", "b", "c", "b", "d", "e"], ["f", "g"]]
+#ref_orient = [["+", "+", "+", "-", "+", "+"], ["+", "+"]]
+
+
+#print scaffold
+#print reference
+
+
+# dictionary containing relationship: contig -> [reference]
+refdict = {}
+for count, ref in enumerate(reference):
+    for r in ref:
+        if r not in refdict:
+            refdict[r] = set()
+        refdict[r].add(count)
+#print refdict
+
+print "OVERALL LINKS:", sum(map(lambda x: len(x) - 1, scaffold))
+
+
+allscaf = [item for sublist in scaffold for item in sublist]
+
+#print allscaf, "ALLSCAF"
+
+allref = [item for sublist in reference for item in sublist]
+
+#print allref, "ALLREF"
+
+sorient = [item for sublist in scaf_orient for item in sublist]
+rorient = [item for sublist in ref_orient for item in sublist]
 
 
 # scaffmatch
@@ -301,7 +341,7 @@ zedweights = []
 
 #print cons_pairs_outer, "CONS PAIRS OUTER"
 
-
+xz_corr = {} # correspondence between x variables and z
 used_x = set()
 z = 0
 for link in cons_pairs_outer:
@@ -320,9 +360,14 @@ for link in cons_pairs_outer:
                 ww.append(w)
                 cpx.variables.add(lb = [0], ub = [1], types = ["B"], names = ["Z#%s" % z])
                 #print cons[0][index[0]], "JJJJJ"
+                print cons[0], "CONS0"
+                print cons[1], "CONS1"
+                print index, "INDEX"
+                print link, "LINK"
                 inds = ["X#%s#%s" % cons[0][index[0]], "X#%s#%s" % cons[1][index[1]], "Z#%s" % z]
                 used_x.add("X#%s#%s" % cons[0][index[0]])
                 used_x.add("X#%s#%s" % cons[1][index[1]])
+                xz_corr["Z#%s" % z] = ("X#%s#%s" % cons[0][index[0]], "X#%s#%s" % cons[1][index[1]])
                 #print inds
                 vals = [1, 1, -2]
                 c = cplex.SparsePair(ind = inds, val = vals)
@@ -363,9 +408,10 @@ for link in cons_pairs_outer:
 for zed, w in zip(allzeds, zedweights):
     cpx.objective.set_linear(zed, w)
 
-for var in variables:
+#for var in variables:
     #if var not in used_x:
-    cpx.objective.set_linear("X#%s#%s" % var, 0.0000001)
+    #cpx.objective.set_linear("X#%s#%s" % var, 0.0000001)
+    #cpx.objective.set_linear("X#%s#%s" % var, 1)
 
 
 #for var, ori in zip(variables, orient_weights):
@@ -407,11 +453,25 @@ for scaf in scaffold:
         scafs.append("NONE")
 
 for x, y in zip(cpx.variables.get_names(), cpx.solution.get_values()):
-    if y > 0.1 and "X" in x:
+    if y > 0.5 and "X" in x:
         x = x.split("#")
         a = int(x[1])
         b = int(x[2].split("_")[1])
         scafs[b] = a
+
+good_links = []
+for x, y in zip(cpx.variables.get_names(), cpx.solution.get_values()):
+    if y > 0.5 and "Z" in x:
+        # collect correct links
+        fl, sl = xz_corr[x]
+        fl = fl.split("#")
+        b1 = int(fl[2].split("_")[1])
+        sl = sl.split("#")
+        b2 = int(sl[2].split("_")[1])
+        correct = tuple(sorted([b1, b2]))
+        good_links.append(correct)
+
+
 
 j = 0
 scaf_answer = []
@@ -421,6 +481,155 @@ for scaf in scaffold:
         sa.append(scafs[j])
         j += 1
     scaf_answer.append(sa)
+
+print scaf_answer
+
+# now fill out those which were not assigned to anything
+
+assigned = {}
+for i, sc in enumerate(scaf_answer):
+    for j, s in enumerate(sc):
+        if s != "NONE":
+            assigned[s] = (i, j)
+
+
+newly_assigned = {}
+for i, x, y in zip(range(len(scaf_answer)), scaf_answer, scaffold):
+    for j, xx, yy in zip(range(len(x)), x, y):
+        if xx == "NONE":
+            indices = []
+            for k in range(len(allref)):
+                if allref[k] == yy:
+                    indices.append(k)
+            for ind in indices:
+                if ind in assigned:
+                    continue
+                else:
+                    assigned[ind] = (i, j)
+                    newly_assigned[ind] = (i, j)
+                    break
+
+
+
+for x, y in newly_assigned.items():
+    u, v = y
+    scaf_answer[u][v] = x
+
+
+# after assignment, if there is still something 
+
+print "AAAAAAAAAAAAAAAAA", scaf_answer
+
+
+scaf_answer_human = []
+asc = iter(allscaf)
+for scaf in scaf_answer:
+    myscaf = []
+    for sc in scaf:
+        myscaf.append(asc.next())
+    scaf_answer_human.append(myscaf)
+
+
+print "MMMMMMMMMMMM", scaf_answer_human
+
+
+
+wrong_links = []
+corrected_chains = []
+position = 0
+for scaffold in scaf_answer:
+    correct_subscaffold = [[scaffold[0]]]
+    for j in range(1, len(scaffold)):
+        if (position, position + 1) in good_links:
+            correct_subscaffold[-1].append(scaffold[j])
+        else:
+            correct_subscaffold.append([scaffold[j]])
+            wrong_links.append((position, position + 1, scaffold[j - 1], scaffold[j]))
+        position += 1
+    position += 1
+    corrected_chains.extend(correct_subscaffold)
+
+corrected_chains = [x for x in corrected_chains if x != ['NONE']]
+
+print corrected_chains
+
+scaf_answer_human = []
+asc = iter(allscaf)
+for scaf in corrected_chains:
+    myscaf = []
+    for sc in scaf:
+        myscaf.append(asc.next())
+    scaf_answer_human.append(myscaf)
+
+
+
+
+# classify wrong links
+wrong_copy = 0
+jumping = 0
+wrong_ord_ori = 0
+wrong_ref = 0
+jumping_wrong_ord_ori = 0
+
+
+
+for aa, bb, cc, dd in wrong_links:
+    is_jumping = False
+    is_wrong_ord_ori = False
+    is_wrong_copy = False
+    is_wrong_ref = False
+    print aa, bb, cc, dd
+    if cc != "NONE" and dd != "NONE":
+        o1, o2, o3, o4 = sorient[int(aa)], sorient[int(bb)], rorient[int(cc)], rorient[int(dd)]
+        is_jumping = abs(int(cc) - int(dd)) > 1
+        if (o1, o2 != o3, o4) or (o1, o2 != op(o4), op(o3)):
+            is_wrong_ord_ori = True
+        is_wrong_copy = False
+        is_wrong_ref = refdict[allref[int(cc)]] & refdict[allref[int(dd)]] == set()
+    else:
+        is_jumping = False
+        is_wrong_ord_ori = False
+        is_wrong_ref = False
+        is_wrong_copy = True
+
+    if is_wrong_copy:
+        wrong_copy += 1
+        print "AAA - wrong copy"
+    elif is_wrong_ref:
+        wrong_ref += 1
+        print "BBB - wrong ref"
+    elif is_jumping and is_wrong_ord_ori:
+        jumping_wrong_ord_ori += 1
+        print "CCC - jumping + ord_ori"
+    elif is_jumping:
+        jumping += 1
+        print "DDD - jumping"
+    elif is_wrong_ord_ori:
+        wrong_ord_ori += 1
+        print "EEE -wrong ord ori"
+
+print "COPY:" , wrong_copy
+print "REF:", wrong_ref
+print "JUMPING:", jumping
+print "ORDER_ORIENTATION:", wrong_ord_ori
+print "J+ORD_ORI", jumping_wrong_ord_ori
+
+
+corlens = map(len, corrected_chains)
+print "MEAN CHAIN LENGTH:", sum(corlens) * 1.0 / len(corlens)
+print "MAX CHAIN LENGTH:", max(corlens)
+
+
+# compute n50 (contig chains)
+sumalllens = sum(corlens) * 1.0 / 2
+scorlens = sorted(corlens, reverse=True)
+cursum = 0
+i = 0
+while (cursum < sumalllens):
+    cursum += scorlens[i]
+    i += 1
+
+print "CHAIN N50:", scorlens[i - 1]
 
 #print scaf_answer
 
