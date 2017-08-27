@@ -108,7 +108,6 @@ for alllinegroup, group in zip(alllinegroups, allgroups):
             else:
                 # check if this is the only hit
                 #print ("DECI SUKA")
-                print (group2)
                 name = group2[0][12]
                 if group2[0][12] in contig_hits_counts and contig_hits_counts[group2[0][12]] == 1:
                     scaf.append(name + ":::" + group2[0][10] + ":::" + str(int(group2[-1][1]) - int(group2[0][0])))
@@ -124,15 +123,14 @@ for alllinegroup, group in zip(alllinegroups, allgroups):
 
 unused_contigs = set(ref_contigs.keys()) - used_contigs
 
-print(unused_contigs)
 
 for refcont in unused_contigs:
     for outscaf, outseq in output_scaffolds.items():
         if outseq in ref_contigs[refcont]:
-            print(refcont + " " +  outscaf)
+            #print(refcont + " " +  outscaf)
             break
         elif outseq in str(Seq(ref_contigs[refcont]).reverse_complement()):
-            print (refcont + " " + outscaf)
+            #print (refcont + " " + outscaf)
             break
 
 
