@@ -9,9 +9,11 @@ from fastaq import sequences, utils, intervals, tasks
 
 
 prefix = sys.argv[3]
+similarity_level = sys.argv[4]
+smallest_contig_length = sys.argv[5]
 
 utils.syscall(' '.join(['nucmer', '-p', prefix, sys.argv[1], sys.argv[2], '--maxmatch']))
-utils.syscall(' '.join(['delta-filter', '-i 97 -l 200 -r', prefix + ".delta", '>', prefix + ".filter"]))
+utils.syscall(' '.join(['delta-filter', '-i %s -l %s -r' % (similarity_level, smallest_contig_length), prefix + ".delta", '>', prefix + ".filter"]))
 utils.syscall(' '.join(['show-coords', '-dTlro', prefix + ".filter", '>', prefix + ".coords"]))
 
 

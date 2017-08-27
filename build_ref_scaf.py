@@ -72,12 +72,13 @@ class NucmerHit:
 
 parser = argparse.ArgumentParser(
     description = 'Takes contigs and a reference sequence. Makes a new fasta file of the contigs, but they are now perfect sequences by using the reference instead',
-    usage = '%(prog)s [options] <contigs.fa> <reference.fa> <outprefix>')
-parser.add_argument('--min_seq_length', type=int, help='Minimum length of contig to output [%(default)s]', default=200)
+    usage = '%(prog)s [options] <contigs.fa> <reference.fa> <outprefix> <smallest.contig.length> <similarity.level>')
 parser.add_argument('--nucmer_options', help='Options when running nucmer [%(default)s]', default='')
 parser.add_argument('contigs_fa', help='Name of contigs fasta file', metavar='contigs.fa')
 parser.add_argument('ref_fa', help='Name of reference fasta file', metavar='reference.fa')
 parser.add_argument('outprefix', help='Prefix of output files')
+parser.add_argument('min_seq_length', type=int, help='Minimum length of contig to output', metavar='smallest.contig.length')
+parser.add_argument('sim_level', type=int, help='Minimum similarity level of nucmer hits to consider', metavar='similarity.level')
 options = parser.parse_args()
 
 ref_seqs = {}
@@ -87,8 +88,8 @@ nucmer_out_prefix = options.outprefix
 nucmer_out_delta = nucmer_out_prefix + '.delta'
 nucmer_out_filter = nucmer_out_prefix + '.filter'
 nucmer_out_coords = nucmer_out_prefix + '.coords'
-
-
+smallest_contig_length = options.min_seq_length
+similarity_level = options.sim_level
 
 # load contigs into memory
 sw = {}
@@ -103,7 +104,7 @@ handle.close()
 
 # run nucmer of contigs vs ref
 utils.syscall(' '.join(['nucmer', options.nucmer_options, '-p', nucmer_out_prefix, options.ref_fa, options.contigs_fa, '--maxmatch']))
-utils.syscall(' '.join(['delta-filter', '-i 97 -l 200 -r', nucmer_out_delta, '>', nucmer_out_filter]))
+utils.syscall(' '.join(['delta-filter', '-i %s -l %s -r' % (similarity_level, smallest_contig_length), nucmer_out_delta, '>', nucmer_out_filter]))
 utils.syscall(' '.join(['show-coords', '-dTlro', nucmer_out_filter, '>', nucmer_out_coords]))
 
 # load hits into hash. key=ref_name, value=another hash with key=qry_name, value=list of hit positions in that ref seq
@@ -188,7 +189,7 @@ with open(preliminary, "w") as f:
 
 
 utils.syscall(' '.join(['nucmer', options.nucmer_options, '-p', nucmer_out_prefix, options.ref_fa, preliminary, '--maxmatch']))
-utils.syscall(' '.join(['delta-filter', '-i 97 -l 200 -r', nucmer_out_delta, '>', nucmer_out_filter]))
+utils.syscall(' '.join(['delta-filter', '-i %s -l %s -r' % (similarity_level, smallest_contig_length), nucmer_out_delta, '>', nucmer_out_filter]))
 utils.syscall(' '.join(['show-coords', '-dTlro', nucmer_out_filter, '>', nucmer_out_coords]))
 
 
