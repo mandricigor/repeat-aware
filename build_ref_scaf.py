@@ -103,7 +103,7 @@ handle.close()
 
 # run nucmer of contigs vs ref
 utils.syscall(' '.join(['nucmer', options.nucmer_options, '-p', nucmer_out_prefix, options.ref_fa, options.contigs_fa, '--maxmatch']))
-utils.syscall(' '.join(['delta-filter', '-i 97 -l 180 -r', nucmer_out_delta, '>', nucmer_out_filter]))
+utils.syscall(' '.join(['delta-filter', '-i 97 -l 200 -r', nucmer_out_delta, '>', nucmer_out_filter]))
 utils.syscall(' '.join(['show-coords', '-dTlro', nucmer_out_filter, '>', nucmer_out_coords]))
 
 # load hits into hash. key=ref_name, value=another hash with key=qry_name, value=list of hit positions in that ref seq
@@ -188,7 +188,7 @@ with open(preliminary, "w") as f:
 
 
 utils.syscall(' '.join(['nucmer', options.nucmer_options, '-p', nucmer_out_prefix, options.ref_fa, preliminary, '--maxmatch']))
-utils.syscall(' '.join(['delta-filter', '-i 97 -l 180 -r', nucmer_out_delta, '>', nucmer_out_filter]))
+utils.syscall(' '.join(['delta-filter', '-i 97 -l 200 -r', nucmer_out_delta, '>', nucmer_out_filter]))
 utils.syscall(' '.join(['show-coords', '-dTlro', nucmer_out_filter, '>', nucmer_out_coords]))
 
 
