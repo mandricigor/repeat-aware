@@ -45,15 +45,19 @@ def parse_scaf_file(scaffile):
     answer = []
     orient = []
     distances = []
+    lengths_main = []
     for scaf in a:
         scaf2 = []
         ori = []
         dist = []
+        lengths = []
         for contig in scaf:
             contig = contig.split(":::")
             name = contig[0].split("_")[1]
             gap = int(contig[3])
+            length = int(contig[2])
             dist.append(gap)
+            lengths.append(length)
             scaf2.append(name)
             if contig[1] == "1":
                 ori.append("+")
@@ -63,7 +67,8 @@ def parse_scaf_file(scaffile):
         orient.append(ori)
         del dist[-1]
         distances.append(dist)
-    return answer, orient, distances
+        lengths_main.append(lengths)
+    return answer, orient, distances, lengths_main
 
 
 
@@ -71,8 +76,8 @@ def parse_scaf_file(scaffile):
 
 
 
-scaffold, scaf_orient, sdistances = parse_scaf_file(sys.argv[1])
-reference, ref_orient, rdistances = parse_scaf_file(sys.argv[2])
+scaffold, scaf_orient, sdistances, slengths = parse_scaf_file(sys.argv[1])
+reference, ref_orient, rdistances, rlengths = parse_scaf_file(sys.argv[2])
 if len(sys.argv) < 4:
     distance_threshold = 1000
 else:
@@ -101,6 +106,11 @@ for count, ref in enumerate(reference):
 
 
 
+
+
+
+
+
 allscaf = [item for sublist in scaffold for item in sublist]
 allref = [item for sublist in reference for item in sublist]
 
@@ -109,19 +119,71 @@ sorient = [item for sublist in scaf_orient for item in sublist]
 rorient = [item for sublist in ref_orient for item in sublist]
 
 
+
+
+
 cons1 = []
 cons2 = []
 condict = {}
 
 
 ref_distances = {}
-#allref_distances = [item for sublist in rdistances for item in sublist]
 i = 0
 for k, refer in enumerate(reference):
     for j in range(len(refer) - 1):
         ref_distances[(i, i + 1)] = rdistances[k][j]
         i += 1
     i += 1
+
+
+scaf_distances = {}
+i = 0
+for k, sc in enumerate(scaffold):
+    for j in range(len(sc) - 1):
+        scaf_distances[(i, i + 1)] = sdistances[k][j]
+        i += 1
+    i += 1
+
+
+
+r_cont_number = sum(map(len, reference))
+
+
+i = 0
+for k in range(r_cont_number - 1):
+    #print i, i + 1, "MKKK"
+    if (i, i + 1) not in ref_distances:
+        ref_distances[(i, i + 1)] = 100000000
+    i += 1
+
+
+#print r_cont_number
+#print ref_distances, rlengths, "LENTGHTS AAA"
+
+
+
+allrlens = []
+for r in rlengths:
+    allrlens.extend(r)
+
+
+ref_all_distances = {}
+# computed distances between contigs on the reference
+for k in range(r_cont_number - 1):
+    overall_distance = ref_distances[(k, k + 1)] + allrlens[k + 1]
+    #print overall_distance, k, "KJKJKJK"
+    for m in range(k + 2, r_cont_number):
+        overall_distance += ref_distances[(m - 1, m)]
+        #print k, m, overall_distance, "JJJJJ"
+        ref_all_distances[(k, m)] = overall_distance
+        overall_distance += allrlens[m]
+
+
+print ref_all_distances, "REF_ALL_DISTANCES"
+
+for xxx in ref_distances:
+    ref_all_distances[xxx] = ref_distances[xxx]
+
 
 scaf_distances = {}
 
@@ -152,6 +214,9 @@ for ref in reference:
         i += 1
         cons1.append(c1)
 
+#print cons1, "CONS1"
+
+
 
 for x, y in condict.items():
     if len(y) > 1:
@@ -168,6 +233,9 @@ scaf_outer = set()
 for scaf in scaffold:
     for a1, a2 in pairwise(scaf):
         scaf_outer.add(tuple(sorted([a1, a2])))
+
+
+#print scaf_outer, "SCAF OUTER"
 
 
 
@@ -208,8 +276,12 @@ for scaf, ori in zip(scaffold, scaf_orient):
 
 
 
+
+
 cons_pairs_outer = {}
 cons_pairs_orient = {}
+
+"""
 j = 0
 for ref, ori in zip(reference, ref_orient):
     for i in range(len(ref) - 1):
@@ -228,6 +300,30 @@ for ref, ori in zip(reference, ref_orient):
                 cons_pairs_orient[link].append([op(o2), op(o1)])
         j += 1
     j += 1
+"""
+
+for crefs, di in ref_all_distances.items():
+    if di < 2000:
+        cref1, cref2 = crefs
+        link = tuple(sorted([allref[cref1], allref[cref2]]))
+        #print link, "LINKLLLLLLLLLLLLLLLLLLL"
+        if link not in outer_indices:
+            continue
+        o1, o2 = rorient[cref1], rorient[cref2]
+        if link not in cons_pairs_outer:
+            cons_pairs_outer[link] = []
+        if link not in cons_pairs_orient:
+            cons_pairs_orient[link] = []
+        if link == (allref[cref1], allref[cref2]):
+            cons_pairs_outer[link].append([cons1[cref1], cons1[cref2]])
+            cons_pairs_orient[link].append([o1, o2])
+        else:
+            cons_pairs_outer[link].append([cons1[cref2], cons1[cref1]])
+            cons_pairs_orient[link].append([op(o2), op(o1)])
+        
+
+
+
 
 
 
@@ -278,6 +374,11 @@ for con in cons2:
 #print scaf_distances
 
 
+
+#print cons_pairs_outer, "HHHHHHHHHHHHHHHHHHHHHHHHHHHHH"
+
+
+
 allzeds = []
 zedweights = []
 
@@ -297,7 +398,7 @@ for link in cons_pairs_outer:
         zz = []
         ww = []
         for index, sori in zip(cind, cind_orient):
-            rgap = max(0, ref_distances[tuple(sorted([cons[0][index[0]][0], cons[1][index[1]][0]]))])
+            rgap = max(0, ref_all_distances[tuple(sorted([cons[0][index[0]][0], cons[1][index[1]][0]]))])
             sgap = max(0, scaf_distances[tuple(sorted([cons[0][index[0]][1], cons[1][index[1]][1]], key=lambda mm: int(mm.split("_")[1])))])
             #print sgap, rgap, cons, cind, index
             if abs(rgap - sgap) > distance_threshold:
@@ -470,7 +571,7 @@ for scaf in scaf_answer:
 #print len(scaf_answer_human)
 #print map(len, scaf_answer_human)
 
-print good_links
+#print good_links
 wrong_links = []
 corrected_chains = []
 position = 0
@@ -478,7 +579,7 @@ for scaffold in scaf_answer:
     correct_subscaffold = [[scaffold[0]]]
     for j in range(1, len(scaffold)):
         if (position, position + 1) in good_links:
-            print scaffold[j - 1], scaffold[j], allscaf[position], allscaf[position + 1]
+            print "CORRECT LINK:", scaffold[j - 1], scaffold[j], allscaf[position], allscaf[position + 1]
             correct_subscaffold[-1].append(scaffold[j])
         else:
             correct_subscaffold.append([scaffold[j]])
