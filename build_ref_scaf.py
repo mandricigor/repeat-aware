@@ -1,328 +1,538 @@
-#!/usr/bin/env python3
 
-import argparse
-import os
-import copy
-import shutil
+
+import networkx as nx
 import sys
-from fastaq import sequences, utils, intervals, tasks
-
-
+import subprocess
 from Bio import SeqIO
-import sys
+
+
+def syscall(cmd):
+    retcode = subprocess.call(cmd, shell=True)
+    if retcode != 0:
+        raise Exception("Error in system call. Command was:\n" + cmd)
+
+
+ref_fa = sys.argv[1]
+contigs_fa = sys.argv[2]
+prefix = sys.argv[3]
+similarity_level = int(sys.argv[4])
+smallest_contig_length = int(sys.argv[5])
+
+
+syscall(' '.join(['nucmer', '-p', prefix, ref_fa, contigs_fa, '--maxmatch', '--nosimplify']))
+syscall(' '.join(['delta-filter', '-i %s -l %s ' % (similarity_level, smallest_contig_length), prefix + ".delta", '>', prefix + ".filter"]))
+syscall(' '.join(['show-coords', '-dTlro', prefix + ".filter", '>', prefix + ".coords"]))
 
 
 
-# check required nucmer programs are in path
-progs = ['nucmer', 'delta-filter', 'show-coords']
-not_in_path = [p for p in progs if shutil.which(p) is None]
-    
-if len(not_in_path):
-    print('Error! Need these programs to be in your path:', file=sys.stderr)
-    print('\n'.join(not_in_path), file=sys.stderr)
-    print('Cannot continue', file=sys.stderr)
-    sys.exit(1)
-
-
-def nucmer_file_reader(fname):
-    f = utils.open_file_read(fname)
-    in_header = True
-
-    for line in f:
-        if in_header:
-            if line.startswith('['):
-                in_header = False
-            continue
-        yield NucmerHit(line)
-
-    utils.close(f)
-
-
-class NucmerHit:
-    def __init__(self, line):
-        # [S1]  [E1]    [S2]    [E2]    [LEN 1] [LEN 2] [% IDY] [LEN R] [LEN Q] [FRM]   [TAGS]
-        #1162    25768   24536   4   24607   24533   99.32   640851  24536   1   -1  MAL1    NODE_25757_length_24482_cov_18.920391   [CONTAINS]
-        try:
-            l = line.rstrip().split('\t')
-            self.ref_start = int(l[0])
-            self.ref_end = int(l[1])
-            self.qry_start = int(l[2])
-            self.qry_end = int(l[3])
-            self.hit_length_ref = int(l[4])
-            self.hit_length_qry = int(l[5])
-            self.percent_identity = float(l[6])
-            self.ref_length = int(l[7])
-            self.qry_length = int(l[8])
-            self.frame = int(l[9])
-            self.strand = int(l[10])
-            self.ref_name = l[11]
-            self.qry_name = l[12]
-
-            if len(l) == 14:
-                self.tag = l[13][1:-1]
-            else:
-                self.tag = None
-        except:
-            print('Error reading this nucmer line:\n' + line, file=sys.stderr)
-
-    def __str__(self):
-         return str(self.qry_name) + " : " + str(self.ref_start) + " - " + str(self.ref_end)
 
 
 
-parser = argparse.ArgumentParser(
-    description = 'Takes contigs and a reference sequence. Makes a new fasta file of the contigs, but they are now perfect sequences by using the reference instead',
-    usage = '%(prog)s [options] <contigs.fa> <reference.fa> <outprefix> <smallest.contig.length> <similarity.level>')
-parser.add_argument('--nucmer_options', help='Options when running nucmer [%(default)s]', default='')
-parser.add_argument('contigs_fa', help='Name of contigs fasta file', metavar='contigs.fa')
-parser.add_argument('ref_fa', help='Name of reference fasta file', metavar='reference.fa')
-parser.add_argument('outprefix', help='Prefix of output files')
-parser.add_argument('min_seq_length', type=int, help='Minimum length of contig to output', metavar='smallest.contig.length')
-parser.add_argument('sim_level', type=int, help='Minimum similarity level of nucmer hits to consider', metavar='similarity.level')
-options = parser.parse_args()
 
-ref_seqs = {}
-tasks.file_to_dict(options.ref_fa, ref_seqs)
 
-nucmer_out_prefix = options.outprefix
-nucmer_out_delta = nucmer_out_prefix + '.delta'
-nucmer_out_filter = nucmer_out_prefix + '.filter'
-nucmer_out_coords = nucmer_out_prefix + '.coords'
-smallest_contig_length = options.min_seq_length
-similarity_level = options.sim_level
 
-# load contigs into memory
+
+
+
+
+
+
+
+
 sw = {}
-handle = open(options.contigs_fa, "rU")
-for record in SeqIO.parse(handle, "fasta"):
-    sw[record.id] = record.seq.tostring()
-handle.close()
+for record in SeqIO.parse(contigs_fa, "fasta"):
+    sw[record.id] = str(record.seq)
 
 
-
-
-
-# run nucmer of contigs vs ref
-utils.syscall(' '.join(['nucmer', options.nucmer_options, '-p', nucmer_out_prefix, options.ref_fa, options.contigs_fa, '--maxmatch']))
-utils.syscall(' '.join(['delta-filter', '-i %s -l %s -r' % (similarity_level, smallest_contig_length), nucmer_out_delta, '>', nucmer_out_filter]))
-utils.syscall(' '.join(['show-coords', '-dTlro', nucmer_out_filter, '>', nucmer_out_coords]))
-
-# load hits into hash. key=ref_name, value=another hash with key=qry_name, value=list of hit positions in that ref seq
-nucmer_hits = {}
-contigs_to_print = {}
-
-
-
-
-nucmer_reader = nucmer_file_reader(nucmer_out_coords)
-
-# this dictionary contains hits for each contig per reference
-hit_ref_dict = {}
-
-for hit in nucmer_reader:
-    hit_dict = hit_ref_dict.setdefault(hit.qry_name, {})
-    ref_list = hit_dict.setdefault(hit.ref_name, [])
-    ref_list.append(hit)
-
-
-
-qry_segments = {}
-for qry_name, qry_dict in hit_ref_dict.items():
-    # determine if we have a full match, if so -> just add it to the list of contigs
-    contains = False
-    good_match = None
-    for ref_name, ref_list in qry_dict.items():
-        contains_contigs = [hit for hit in ref_list if hit.tag == "CONTAINS"]
-        if contains_contigs:
-            contains = True
-            good_match = contains_contigs[0]
-            break
-    if contains:
-        # if we have a hit for a contig which is completely contained 
-        # then we just consider it -> we want to take biggest hit
-        # and ignore the rest of them
-        a, b = (good_match.qry_start, good_match.qry_end)
-        if a > b:
-            qry_segments[qry_name] = [(b, a)]
-        else:
-            qry_segments[qry_name] = [(a, b)]
-    else:
-        segments = []
-        for ref_name, ref_list in qry_dict.items():
-            hits = sorted(ref_list, key=lambda z: z.ref_start)
-            # merge all overlapping hits for each reference
-            merging = [[0]]
-            for i in range(1, len(hits)):
-                if hits[i].ref_start <= hits[merging[-1][-1]].ref_end + 1:
-                    if hits[i].ref_end > hits[merging[-1][-1]].ref_end:
-                        merging[-1].append(i)
-                else:
-                    merging.append([i])
-            for merge_group in merging:
-                a, b = (hits[merge_group[0]].qry_start, hits[merge_group[-1]].qry_end)
-                if a > b:
-                    segments.append((b, a))
-                else:
-                    segments.append((a, b))
-        qry_segments[qry_name] = segments
-
-
-
-###################################################
-
-preliminary = options.outprefix + '.fa'
-# print the preliminary perfect contigs
-with open(preliminary, "w") as f:
-    for x, y in qry_segments.items():
-        if len(y) > 1:
-            counter = 1
-            for u, v in y:
-                f.write(">%s\n" % (x + "_" + str(counter)))
-                f.write("%s\n" % sw[x][(u - 1):(v - 1)])
-                counter += 1
-        else:
-            f.write(">%s\n" % x)
-            f.write("%s\n" % sw[x][(y[0][0] - 1):(y[0][1] - 1)])
-
-
-
-
-
-utils.syscall(' '.join(['nucmer', options.nucmer_options, '-p', nucmer_out_prefix, options.ref_fa, preliminary, '--maxmatch']))
-utils.syscall(' '.join(['delta-filter', '-i %s -l %s -r' % (similarity_level, smallest_contig_length), nucmer_out_delta, '>', nucmer_out_filter]))
-utils.syscall(' '.join(['show-coords', '-dTlro', nucmer_out_filter, '>', nucmer_out_coords]))
-
-
-
-
-
-
-
-
-
-
-
-# load into memory the contigs
-sw = {}
-handle = open(preliminary, "rU")
-for record in SeqIO.parse(handle, "fasta"):
-    sw[record.id] = record.seq.tostring()
-handle.close()
-
-
-prefix = options.outprefix
-
-# load coordinates
-with open(nucmer_out_coords) as f:
+with open(prefix + ".coords") as f:
     a = f.readlines()
 
-a = a[4:] # drop the header lines from nucmer hit file
-a = list(map(lambda x: x.strip().split(), a))
 
-# groups is the list of groups by reference
-groups = [[a[0]]]
-linegroups = [[0]]
-for i in range(1, len(a)):
-    if a[i][11] == groups[-1][-1][11]:
-        groups[-1].append(a[i])
-        linegroups[-1].append(i)
+a = map(lambda x: x.strip().split(), a[4:])
+
+# remove duplicate lines
+aa = [a[0]]
+for line in a[1:]:
+    if line == aa[-1]:
+        continue
     else:
-        groups.append([a[i]])
-        linegroups.append([i])
+        aa.append(line)
+
+a = aa
+# removed duplicate lines
 
 
-# because we may have that some contigs 
-allgroups = []
-alllinegroups = []
-for linegroup, group in zip(linegroups, groups):
-    group2 = [[group[0]]]
-    linegroup2 = [[linegroup[0]]]
-    for j in range(1, len(group)):
-        if group[j][12] == group2[-1][-1][12]:
-            group2[-1].append(group[j])
-            linegroup2[-1].append(linegroup[j])
+
+# count the occurence of each contig
+counts = {}
+for line in a:
+    if line[12] not in counts:
+        counts[line[12]] = 0
+    counts[line[12]] += 1
+# found counts of each contig
+
+
+refs = [[a[0]]]
+for line in a[1:]:
+    if line[11] == refs[-1][-1][11]:
+        refs[-1].append(line)
+    else:
+        refs.append([line])
+
+
+
+
+# find contigs contained inside others
+contained = {}
+junk_lines = []
+for ref in refs:
+    aa = [[ref[0]]]
+    for line in ref[1:]:
+        c1 = int(line[0])
+        c2 = int(line[1])
+        if c1 <= int(aa[-1][-1][1]) and c2 <= int(aa[-1][-1][1]):
+            if line[12] not in contained:
+                contained[line[12]] = 0
+            contained[line[12]] += 1
+            junk_lines.append(line)
+        elif c1 <= int(aa[-1][-1][1]) and c2 > int(aa[-1][-1][1]):
+            aa[-1].append(line)
         else:
-            group2.append([group[j]])
-            linegroup2.append([linegroup[j]])
-    allgroups.append(group2)
-    alllinegroups.append(linegroup2)
+            aa.append([line])
 
 
-contig_map = {}
-global_counter = 0
 
-scaffolds = []
-chosen_lines = []
-for alllinegroup, group in zip(alllinegroups, allgroups):
-    scaf = []
-    chosen = []
-    for linegroup2, group2 in zip(alllinegroup, group):
-        if len(group2) == 1 and len(group2[0]) == 12:
-            # if the contig does not match completely -> skip it
-            # we do not need it anymore
+# try without filtering out
+#for jl in junk_lines:
+#    print jl
+#
+#a = [xxx for xxx in a if xxx not in junk_lines]
+
+
+
+
+
+
+
+
+
+
+
+
+refs = [[a[0]]]
+for line in a[1:]:
+    if line[11] == refs[-1][-1][11]:
+        refs[-1].append(line)
+    else:
+        refs.append([line])
+
+
+
+
+
+
+
+refdict = {}
+for ref in refs:
+    refdict[ref[0][11]] = ref
+
+
+
+
+
+contig_coords = {} # all coordinates for all contigs
+coords = {}
+for ref, lines in refdict.items():
+    cdict = {}
+    for i, line in enumerate(lines):
+        c1 = int(line[0])
+        c2 = int(line[1])
+        if c1 not in cdict:
+            cdict[c1] = []
+        if c2 not in cdict:
+            cdict[c2] = []
+        cdict[c1].append((line[12] + ":::start:::" + str(i + 1), int(line[2]), int(line[8]), int(line[10]), line[11]))
+        cdict[c2].append((line[12] + ":::end:::" + str(i + 1), int(line[3]), int(line[8]), int(line[10]), line[11]))
+        if line[12] not in contig_coords:
+            contig_coords[line[12]] = []
+        contig_coords[line[12]].append(int(line[2]))
+        contig_coords[line[12]].append(int(line[3]))
+    coords[ref] = cdict
+
+
+
+
+ref_segments = dict()
+ref_segments_dict = {}
+for ref, cs in coords.items():
+    ref_segments_dict[ref] = []
+for ref, cs in coords.items():
+    scs = sorted(cs.items(), key=lambda z: z[0])
+    for i in range(1, len(scs)):
+        refname = scs[i][1][0][4]
+        c1 = int(scs[i - 1][0])
+        c2 = int(scs[i][0])
+        e1 = (refname, c1)
+        e2 = (refname, c2)
+        if not e1 in ref_segments:
+            ref_segments[e1] = []
+        if not e2 in ref_segments:
+            ref_segments[e2] = []
+        ref_segments[e1].append((e1, e2))
+        ref_segments[e2].append((e1, e2))
+        ref_segments_dict[ref].append((e1, e2))
+
+
+print ref_segments_dict, "REF_SEGMENTS_DICT"
+
+
+
+for ref, cs in coords.items():
+    print ref
+    for u in sorted(cs.items(), key=lambda z: z[0]):
+        print u
+    print
+
+
+
+
+working_contigs = set()
+for ref, cs in coords.items():
+    for u in cs.items():
+        for v in u[1]:
+            working_contigs.add(v[0].split(":::")[0])
+
+
+# I need to determine which reference piece appears in which contigs
+# sometimes, it may be misleading. We have to see if the piece is between ones piece start and end
+# then we include it into the corresponding contig
+
+contigs_refpieces = {}
+for contig in working_contigs:
+    contigs_refpieces[contig] = []
+for ref, cs in coords.items():
+    sorted_by_global_ref = sorted(cs.items(), key=lambda z: z[0])
+    bag = dict()
+    for ppp in range(len(sorted_by_global_ref[0][1])):
+        cc, st, on = sorted_by_global_ref[0][1][ppp][0].split(":::")
+        bag[on] = (cc, st)
+    for uu in range(1, len(sorted_by_global_ref)):
+        processed = []
+        u = sorted_by_global_ref[uu]
+        for v in u[1]: # iterate through contigs
+            contig, status, order = v[0].split(":::")
+            for ooo, info in bag.items():
+                cntg, stts = info
+                if stts == "start":
+                    contigs_refpieces[cntg].append(((ref, sorted_by_global_ref[uu - 1][0]), (ref, sorted_by_global_ref[uu][0])))
+            processed.append((order, contig, status))
+        print processed, "PROCESSED"
+        for rdr, cntg, stts in processed:
+            if stts == "start":
+                bag[rdr] = (cntg, stts)
+            elif stts == "end":
+                del bag[rdr]
+        print bag, "BAG"
+
+for ppp, pppp in contigs_refpieces.items():
+    print ppp, pppp, "THIS IS CONTIGS"
+
+
+
+
+breakpoints = {}
+for contig in working_contigs:
+    breakpoints[contig] = {}
+
+
+for ref, cs in coords.items():
+    bag = dict()
+    for u in sorted(cs.items(), key=lambda z: z[0]):
+        global_ref_coord = int(u[0])
+        for v in u[1]: # iterate through contigs
+            contig, status, order = v[0].split(":::")
+            local_coord = int(v[1])
+            contig_len = int(v[2])
+            orient = int(v[3])
+            refname = v[4]
+            if status == "start":
+                bag[order] = (global_ref_coord, contig, status, local_coord, orient, refname)
+            for o, info in bag.items():
+                grc, c, s, l, oo, r = info
+                cur_point_local_delta = oo * (global_ref_coord - grc) # should be positive
+                cur_point_local = l + cur_point_local_delta
+                breakpoints[c][(refname, global_ref_coord)] = max(cur_point_local, 1)
+            if status == "end":
+                del bag[order]
+
+
+
+
+segments_artificial = {}
+
+
+
+for u, v in breakpoints.items():
+    cdict = {}
+
+    for k, t in v.items():
+        if t not in cdict:
+            cdict[t] = []
+        cdict[t].append(k)
+
+
+    good_segments = contigs_refpieces[u]
+
+    print u, sorted(cdict.items(), key=lambda z: z[0]), len(good_segments), good_segments
+
+
+    # let's see which points remain after we filter out small pieces (take for now 200 bp)
+
+
+    sorted_points_on_contig = sorted(cdict.items(), key=lambda z: z[0])
+    remaining_points = set()
+    remaining_segments = set()
+    for g in range(1, len(sorted_points_on_contig)):
+        if sorted_points_on_contig[g][0] - sorted_points_on_contig[g - 1][0] > smallest_contig_length:
+            remaining_points.add(g - 1)
+            remaining_points.add(g)
+            remaining_segments.add((g - 1, g))
+
+    remaining_points = sorted(list(remaining_points))
+    print remaining_points, "REMAINING POINTS"
+    print remaining_segments, "REMAINING SEGMENTS"
+    # now for each segment we have to find out it small covering sub-segments from the contig
+
+    sorted_points_on_contig = sorted(cdict.items(), key=lambda z: z[0])
+    for p1, p2 in good_segments:
+        print "SEARCHING FOR", p1, p2
+        gaps = []
+        i1 = None
+        i2 = None
+        for i in range(len(sorted_points_on_contig)):
+            lcoord, pts = sorted_points_on_contig[i]
+            if p1 in pts:
+                i1 = i
+                break
+        for i in range(len(sorted_points_on_contig)):
+            lcoord, pts = sorted_points_on_contig[i]
+            if p2 in pts:
+                i2 = i
+                break
+        si1, si2 = tuple(sorted([i1, i2]))
+        print si1, si2, "SI1 and SI2"
+
+        valid_segments = set()
+        for mmm in range(si1 + 1, si2 + 1):
+            if (mmm - 1, mmm) in remaining_segments:
+                valid_segments.add((mmm - 1, mmm))
+        print valid_segments, "VS"
+        sorted_valid_segments = sorted(list(valid_segments), key = lambda zzz: zzz[0])
+        if not sorted_valid_segments:
             continue
-        elif len(group2) == 1 and len(group2[0]) == 13:
-            # it has probably a full match
-            if group2[0][12] == "[CONTAINS]":
-                if group2[0][12] in contig_map:
-                    name = contig_map[group2[0][12]]
+        print sorted_valid_segments, "SVS"
+        good_valid_segments = [[sorted_valid_segments[0]]]
+        for mmm in range(1, len(sorted_valid_segments)):
+            if sorted_valid_segments[mmm][0] == good_valid_segments[-1][-1][-1]:
+                good_valid_segments[-1].append(sorted_valid_segments[mmm])
+            else:
+                good_valid_segments.append([sorted_valid_segments[mmm]])
+        print good_valid_segments, "GVS"
+
+
+        allsegm = set()
+        for i in range(si1, si2):
+            allsegm.add((i, i + 1))
+        gapsegm = sorted(list(allsegm - set(sorted_valid_segments)), key=lambda zzz: zzz[0])
+        print gapsegm, "GAPSEGM"
+
+        if gapsegm:
+            gap_segments = [[gapsegm[0]]]
+            for mmm in range(1, len(gapsegm)):
+                if gapsegm[mmm][0] == gap_segments[-1][-1][-1]:
+                    gap_segments[-1].append(gapsegm[mmm])
                 else:
-                    global_counter += 1
-                    name = "contig_%s" % global_counter
-                    contig_map[group2[0][12]] = name
-                scaf.append(name + ":::" + group2[0][10] + ":::" + str(int(group2[0][1]) - int(group2[0][0])))
-                chosen.append(linegroup2)
+                    gap_segments.append([gapsegm[mmm]])
+            gap_segments = map(lambda zzz: (zzz[0][0], zzz[-1][1]), gap_segments)
+            gaps2 = map(lambda zzz: sorted_points_on_contig[zzz[1]][0] - sorted_points_on_contig[zzz[0]][0], gap_segments)
+            print gap_segments, gaps2, "GAP SEGMENTS"
         else:
-            # here we may have contigs corresponding to circular genomes
-            # if it has both [BEGINS] and [ENDS] -> we just split it
-            # or we still have mis-assembly - just merge all hits
-            if int(group2[-1][1]) - int(group2[0][0]) > 0.97 * int(group2[0][8]):
-                #print group2, "MMMMMMMMMMMM"
-                if group2[0][12] in contig_map:
-                    name = contig_map[group2[0][12]]
-                else:
-                    global_counter += 1
-                    name = "contig_%s" % global_counter
-                    contig_map[group2[0][12]] = name
-                scaf.append(name + ":::" + group2[0][10] + ":::" + str(int(group2[-1][1]) - int(group2[0][0])))
-                chosen.append(linegroup2)
-    chosen_lines.append(chosen)
-    scaffolds.append(scaf)
+            gap_segments = []
+            gaps2 = []
+            print gap_segments, "GAP SEGMENTS"
 
 
-distances = []
-for cluster in chosen_lines:
-    dist = [0]
-    for group_number in range(len(cluster) - 2, -1, -1):
-        dist.insert(0, int(a[cluster[group_number + 1][0]][0]) - int(a[cluster[group_number][-1]][1]))
-    distances.append(dist)
+        gapcontig_dict = {}
+        for xxx in gapsegm:
+            gapcontig_dict[xxx] = "GAP"
+        for xxx in sorted_valid_segments:
+            gapcontig_dict[xxx] = "CONTIG"
+        gapcontig_list = []
+        for xxx in sorted(gapcontig_dict.keys(), key=lambda zzz: zzz[0]):
+            if gapcontig_list == []:
+                gapcontig_list.append(gapcontig_dict[xxx])
+            elif gapcontig_dict[xxx] == gapcontig_list[-1]:
+                pass
+            else:
+                gapcontig_list.append(gapcontig_dict[xxx])
+        print gapcontig_list, "GAPCONTIG_LIST"
+
+        good_points = []
+        for xxx in good_valid_segments:
+            for xxxx in xxx:
+                good_points.append(xxxx)
+        #good_points = map(lambda mmm: (mmm[0][0], mmm[-1][1]), good_valid_segments)
+        #print good_points, "GPS"
 
 
-rev_contig_map = {}
-for x, y in contig_map.items():
-    rev_contig_map[y] = x
+        final_subsegments = []
+        for gp1, gp2 in good_points:
+            it1 = sorted_points_on_contig[gp1]
+            it2 = sorted_points_on_contig[gp2]
+            print "GP GP", gp1, gp2, it1, it2, p1, p2
+            if i1 < i2:
+                final_subsegments.append("%s:%s-%s" % (u, it1[0], it2[0]))
+            else:
+                final_subsegments.append("%s:%s-%s" % (u, it2[0], it1[0]))
+        print "%s\t%s\t%s-%s" % ("IGOR_MANDRIC", final_subsegments, p1, p2)
+
+
+        gaps22 = iter(gaps2)
+        final_subsegments2 = iter(final_subsegments)
+        final_chain = []
+        for matter in gapcontig_list:
+            if matter == "GAP":
+                final_chain.append(gaps22.next())
+            elif matter == "CONTIG":
+                final_chain.append(final_subsegments2.next())
+        if i1 > i2:
+            final_chain = list(reversed(final_chain))
+        print "FINAL CHAIN IS THIS", final_chain
+
+
+        if (p1, p2) not in segments_artificial:
+            segments_artificial[(p1, p2)] = {}
+        segments_artificial[(p1, p2)][u] = final_chain
 
 
 
-with open("%s.scaf" % prefix, "w") as f:
-    counter = 1
-    for dist, scaffold in zip(distances, scaffolds):
-        f.write(">scaffold_%s\n" % counter)
-        for d, scaf in zip(dist, scaffold):
-            f.write("%s:::%s\n" % (scaf, d))
-        counter += 1
+print "-----------------------------------------------------------------"
 
 
-with open("%s.fa" % prefix, "w") as f:
-    all_contigs = set()
-    for scaffold in scaffolds:
+
+scafdict = {}
+for aaaa, bbbb in ref_segments_dict.items():
+    scafdict[aaaa] = []
+
+
+for aaaa, bbbb in ref_segments_dict.items():
+    print aaaa, "THIS IS REFERENCE"
+    for xxx in bbbb:
+        print xxx, "\t", segments_artificial.get(xxx)
+        piece = segments_artificial.get(xxx)
+        if piece is None:
+            scafdict[aaaa].append(xxx[1][1] - xxx[0][1])
+        else:
+            alphabetically = sorted(piece.keys())[0]
+            scafdict[aaaa].extend(piece[alphabetically])
+
+
+for aaaa, bbbb in scafdict.items():
+    print "REFERENCE", aaaa
+    for xxx in bbbb:
+        print xxx
+
+
+# now combine the gaps
+
+scafdict2 = {}
+
+for aaaa, bbbb in scafdict.items():
+    i = 0
+    while i < len(bbbb) and type(bbbb[i]) == int:
+        i += 1
+        pass
+    if i >= len(bbbb):
+        continue
+    scaffold = [bbbb[i]]
+    for xxx in bbbb[i + 1:]:
+        if type(xxx) == int and type(scaffold[-1]) == int:
+            scaffold[-1] += xxx
+        elif type(xxx) == str and type(scaffold[-1]) == str:
+            scaffold.append(0)
+            scaffold.append(xxx)
+        else:
+            scaffold.append(xxx)
+    if type(scaffold[-1]) == int:
+        scaffold[-1] = 0
+    else:
+        scaffold.append(0)
+    scafdict2[aaaa] = scaffold
+
+
+for aaaa, bbbb in scafdict2.items():
+    print "REFERENCE MMMMM", aaaa
+    for xxx in bbbb:
+        print xxx
+
+
+final_scaffolds = []
+fasta = {}
+used_or_not = dict()
+counter = 1
+for aaaa, bbbb in scafdict2.items():
+    print len(bbbb), "AAAAAAAAAAAAAAAAAAAAAAAA"
+    scaffold = []
+    for i in range(0, len(bbbb), 2):
+        contigname, coords = bbbb[i].split(":")
+        coord1, coord2 = coords.split("-")
+        cc1, cc2 = tuple(sorted([int(coord1), int(coord2)]))
+        toused = ":".join(map(str, [contigname, cc1, cc2]))
+        sequence = sw[contigname][cc1 - 1: cc2]
+        if toused not in used_or_not:
+            name = "contig_%s" % counter
+            used_or_not[toused] = name
+            counter += 1
+        else:
+            name = used_or_not[toused]
+        print name, bbbb[i]
+        fasta[name] = sequence
+        if int(coord1) < int(coord2):
+            orientation = 1
+        else:
+            orientation = -1
+        scaffold.append("%s:::%s:::%s:::%s\n" % (name, orientation, len(sequence), bbbb[i + 1]))
+        print len(scaffold), "JJJKJK"
+    final_scaffolds.append(scaffold)
+
+
+with open(prefix + ".scaf", "w") as f:
+    for i, scaffold in enumerate(final_scaffolds):
+        f.write(">scaffold_%s\n" % (i + 1))
         for contig in scaffold:
-            all_contigs.add(contig.split(":::")[0])
-    scontigs = []
-    for sc in all_contigs:
-        scontigs.append((sc, int(sc.split("_")[1])))
-    for contig, order in sorted(scontigs, key=lambda z: z[1]):
-        f.write(">%s\n" % contig)
-        f.write("%s\n" % sw[rev_contig_map[contig]])
+            f.write(contig)
+
+
+with open(prefix + ".fasta", "w") as f:
+    for xxx in range(len(fasta)):
+        f.write(">contig_%s\n" % (xxx + 1))
+        f.write("%s\n" % fasta["contig_%s" % (xxx + 1)])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
