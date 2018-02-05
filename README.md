@@ -87,15 +87,16 @@ Our framework takes as input the following:
 We first have to prepare **Reference Scaffolding** dataset which is based on real assembly contigs. Correction of misassemblies has to be done and the output scaffolding is written to the **ref_scaf** file in the **$output** directory:
 
 ~~~bash
-python build_ref_scaf.py $assembly_contigs $reference "$outdir/ref_scaf"
+python build_ref_scaf.py --reference $reference --contigs $assembly_contigs --prefix $ref_scaf"
 ~~~
 
-**ref_scaf** is a file of **.scaf** format similar to one used by [**OPERA**](https://sourceforge.net/projects/operasf/) tool.
+**ref_scaf.scaf** is a file of **.scaf** format similar to one used by [**OPERA**](https://sourceforge.net/projects/operasf/) tool.
 
 Now, having the output scaffolding, we have to create the **out_scaf** **.scaf** file which corresponds to the **Inferred Scaffolding**. In our framework, we align the assembly contigs to the output scaffolding using **nucmer**. Run the following command to get the **out_scaf** file:
 
 ~~~bash
 python build_out_scaf.py $scaffolds "$outdir/ref_scaf.fa" "$outdir/out_scaf"
+python build_out_scaf.py --scafolds $scaffolds --contigs "$outdir/ref_scaf.fa" --outscaf "$outdir/out_scaf"
 ~~~
 
 Finally, to evaluate a scaffolding tool we have to find the assignment of the **Inferred Scaffolding** contigs to the **Reference Scaffolding** contigs. The following command peforms the optimal assignment i.e the assignment which keeps the maximum number of contig links:

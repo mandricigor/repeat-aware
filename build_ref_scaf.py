@@ -4,6 +4,7 @@ import networkx as nx
 import sys
 import subprocess
 from Bio import SeqIO
+import argparse
 
 
 def syscall(cmd):
@@ -12,11 +13,25 @@ def syscall(cmd):
         raise Exception("Error in system call. Command was:\n" + cmd)
 
 
-ref_fa = sys.argv[1]
-contigs_fa = sys.argv[2]
-prefix = sys.argv[3]
-similarity_level = int(sys.argv[4])
-smallest_contig_length = int(sys.argv[5])
+
+
+parser = argparse.ArgumentParser(description='Building reference scaffolding')
+parser.add_argument('--reference', dest="reference", type=str, required=True, help="fasta file with reference genome")
+parser.add_argument('--contigs', dest="contigs", type=str, required=True, help="fasta file with assembly contigs (produced by e.g. Velvet)")
+parser.add_argument('--prefix', dest="prefix", type=str, required=True, help="output prefix")
+parser.add_argument('--simlevel', dest="simlevel", type=float, required=False, default=0.97, help="similarity level at which contigs are considered as identical (parameter to nucmer, default 0.97)")
+parser.add_argument('--length', dest="length", type=int, required=False, default=200, help="smallest contig length in artificial dataset (parameter to nucmer, default 200)")
+
+args = parser.parse_args()
+
+
+
+
+ref_fa = args.reference
+contigs_fa = args.contigs
+prefix = args.prefix
+similarity_level = args.simlevel
+smallest_contig_length = args.length
 
 
 syscall(' '.join(['nucmer', '-p', prefix, ref_fa, contigs_fa, '--maxmatch', '--nosimplify']))

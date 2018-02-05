@@ -5,9 +5,20 @@ from Bio import SeqIO
 import re
 import sys
 from collections import Counter
+import argparse
+
+
+
+parser = argparse.ArgumentParser(description='Building output scaffolding')
+parser.add_argument('--scafolds', dest="scaffolds", type=str, required=True, help="fasta file with output scaffolds")
+parser.add_argument('--contigs', dest="contigs", type=str, required=True, help="fasta file with contigs")
+parser.add_argument('--outscaf', dest="outscaf", type=str, required=True, help="output scaf file (output scaffolding)")
+
+args = parser.parse_args()
+
 
 contigs = {}
-for record in SeqIO.parse(sys.argv[2], "fasta"):
+for record in SeqIO.parse(args.contigs, "fasta"):
     contigs[str(record.seq).upper()] = record.id + ":::1"
     contigs[str(record.seq.reverse_complement()).upper()] = record.id + ":::-1"
 
@@ -16,7 +27,7 @@ a = Counter(contigs.values())
 
 
 scaffolds = []
-for scaffold in SeqIO.parse(sys.argv[1], "fasta"):
+for scaffold in SeqIO.parse(args.scaffolds, "fasta"):
     scaffolds.append(scaffold.seq)
 
 
@@ -26,9 +37,9 @@ for scaffold in scaffolds:
     metacontigs = re.split("[N|n]+", str(scaffold))
     distances = iter(map(len, re.findall("[N|n]+", str(scaffold))) + [0])
     for jj, meta in enumerate(metacontigs):
-        if jj % 1000 == 0:
-            print jj
-        print jj, "MMM"
+        #if jj % 1000 == 0:
+        #    print jj
+        #print jj, "MMM"
         contig = contigs.get(meta, "NA")
         if contig == "NA":
             contained = False
@@ -74,7 +85,7 @@ for scaffold in scaffolds:
     scafs.append(myscaf)
 
 
-with open(sys.argv[3], "w") as f:
+with open(args.outscaf, "w") as f:
     for i, scaf in enumerate(scafs):
         f.write(">scaffold_%s\n" % i)
         for c in scaf:
