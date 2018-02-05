@@ -95,7 +95,6 @@ python build_ref_scaf.py --reference $reference --contigs $assembly_contigs --pr
 Now, having the output scaffolding, we have to create the **out_scaf** **.scaf** file which corresponds to the **Inferred Scaffolding**. In our framework, we align the assembly contigs to the output scaffolding using **nucmer**. Run the following command to get the **out_scaf** file:
 
 ~~~bash
-python build_out_scaf.py $scaffolds "$outdir/ref_scaf.fa" "$outdir/out_scaf"
 python build_out_scaf.py --scafolds $scaffolds --contigs "$outdir/ref_scaf.fa" --outscaf "$outdir/out_scaf"
 ~~~
 
