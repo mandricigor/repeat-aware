@@ -87,7 +87,7 @@ Our framework takes as input the following:
 We first have to prepare **Reference Scaffolding** dataset which is based on real assembly contigs. Correction of misassemblies has to be done and the output scaffolding is written to the **ref_scaf** file in the **$output** directory:
 
 ~~~bash
-python build_ref_scaf.py --reference $reference --contigs $assembly_contigs --prefix $ref_scaf"
+python build_ref_scaf.py --reference $reference --contigs $assembly_contigs --prefix "$outdir/$ref_scaf"
 ~~~
 
 **ref_scaf.scaf** is a file of **.scaf** format similar to one used by [**OPERA**](https://sourceforge.net/projects/operasf/) tool.
