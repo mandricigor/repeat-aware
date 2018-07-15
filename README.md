@@ -92,7 +92,7 @@ python build_ref_scaf.py --reference $reference --contigs $assembly_contigs --pr
 
 **ref_scaf.scaf** is a file of **.scaf** format similar to one used by [**OPERA**](https://sourceforge.net/projects/operasf/) tool.
 
-Run your tool of choice with the contigs from the file "$outdir/$ref_scaf" and get the scaffolds. 
+Run your tool of choice with the contigs from the file "$outdir/$ref_scaf" and get the scaffolds (let's call it $scaffolds file). 
 Now, having the output scaffolding, we have to create the **out_scaf** **.scaf** file which corresponds to the **Inferred Scaffolding**. In our framework, we align the assembly contigs to the output scaffolding using **nucmer**. Run the following command to get the **out_scaf** file:
 
 ~~~bash
